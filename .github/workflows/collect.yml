@@ -1,4 +1,4 @@
-# GitHub Actions: runs collect_tomtom.py every 15 minutes for free and saves the data in the repo.
+# GitHub Actions: runs collect_here.py every 15 minutes for free and saves the data in the repo.
 # Put this file in your repo at:  .github/workflows/collect.yml
 name: collect-traffic
 
@@ -24,8 +24,8 @@ jobs:
 
       - name: Collect one snapshot
         env:
-          TOMTOM_KEY: ${{ secrets.TOMTOM_KEY }}
-        run: python collect_tomtom.py
+          HERE_API_KEY: ${{ secrets.HERE_API_KEY }}
+        run: python collect_here.py
 
       - name: Save data to the repo
         run: |
