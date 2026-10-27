@@ -1,0 +1,37 @@
+# GitHub Actions: runs collect_tomtom.py every 15 minutes for free and saves the data in the repo.
+# Put this file in your repo at:  .github/workflows/collect.yml
+name: collect-traffic
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"   # every 15 minutes (GitHub may delay runs a few minutes, that's fine)
+  workflow_dispatch:          # lets you press "Run workflow" to test it by hand
+
+permissions:
+  contents: write
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install requests tzdata
+
+      - name: Collect one snapshot
+        env:
+          TOMTOM_KEY: ${{ secrets.TOMTOM_KEY }}
+        run: python collect_tomtom.py
+
+      - name: Save data to the repo
+        run: |
+          git config user.name "traffic-bot"
+          git config user.email "traffic-bot@users.noreply.github.com"
+          git add data/
+          git diff --cached --quiet || git commit -m "data $(date -u +%Y-%m-%dT%H:%M)"
+          git pull --rebase
+          git push
