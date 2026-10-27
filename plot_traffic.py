@@ -1,5 +1,5 @@
 """
-Turns the collected TomTom data into a chart you can show your adviser.
+Turns the collected HERE traffic data into a chart you can show your adviser.
 
 Usage (from the folder that has the data/ folder):
     pip install pandas matplotlib
@@ -24,7 +24,7 @@ GRID = "#e1e0d9"
 AXIS = "#c3c2b7"
 SURFACE = "#fcfcfb"
 
-files = sorted(glob.glob("data/traffic_*.csv"))
+files = sorted(glob.glob("data/*.csv"))
 if not files:
     raise SystemExit("No data yet. Put the data/ folder next to this script first.")
 
@@ -56,7 +56,8 @@ for ax, name in zip(axes.flat, points):
         ax.spines[side].set_visible(False)
     ax.spines["bottom"].set_color(AXIS)
     ax.tick_params(colors=MUTED, labelsize=8, length=0)
-    ax.set_xlim(df["timestamp"].min(), df["timestamp"].max())
+    if df["timestamp"].min() < df["timestamp"].max():
+        ax.set_xlim(df["timestamp"].min(), df["timestamp"].max())
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%a %H:%M"))
 
 for ax in list(axes.flat)[len(points):]:
@@ -64,7 +65,7 @@ for ax in list(axes.flat)[len(points):]:
 
 start, end = df["timestamp"].min(), df["timestamp"].max()
 snaps = df["timestamp"].nunique()
-fig.suptitle(f"Real traffic speed in Amman (TomTom), {start:%d %b %H:%M} to "
+fig.suptitle(f"Real traffic speed in Amman (HERE live traffic), {start:%d %b %H:%M} to "
              f"{end:%d %b %H:%M} - {snaps} snapshots, {len(df)} readings",
              x=0.01, ha="left", fontsize=11, color=INK)
 fig.tight_layout()
