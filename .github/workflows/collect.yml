@@ -3,8 +3,6 @@
 name: collect-traffic
 
 on:
-  schedule:
-    - cron: "*/15 * * * *"   # every 15 minutes (GitHub may delay runs a few minutes, that's fine)
   workflow_dispatch:          # lets you press "Run workflow" to test it by hand
 
 permissions:
