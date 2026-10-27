@@ -1,0 +1,1 @@
+timestamp,weekday,hour,minute,name,lat,lon,road_class,current_speed_kmh,free_flow_speed_kmh,current_travel_time_s,free_flow_travel_time_s,congestion_ratio,confidence,road_closure
