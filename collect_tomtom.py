@@ -22,7 +22,9 @@ import requests
 KEY = os.environ.get("TOMTOM_KEY")
 POINTS_FILE = "points.csv"
 OUT_DIR = "data"
-URL = "https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/10/json"
+# Zoom 22 = full street detail. Lower zooms only include major highways,
+# so city-street points get "400 Bad Request" (no road found near the point).
+URL = "https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/22/json"
 MAX_POINTS = 25  # 25 x 96 = 2,400 requests/day, just under the free limit
 
 FIELDS = [
@@ -60,7 +62,9 @@ def fetch(point):
         "key": KEY,
     }
     r = requests.get(URL, params=params, timeout=20)
-    r.raise_for_status()
+    if r.status_code != 200:
+        # Show TomTom's answer, never the URL (it contains the key)
+        raise RuntimeError(f"HTTP {r.status_code} from TomTom: {r.text[:200]}")
     return r.json()["flowSegmentData"]
 
 
@@ -71,48 +75,50 @@ def main():
     points = load_points()
     now = datetime.datetime.now(ZoneInfo("Asia/Amman"))
 
+    rows = []
+    for p in points:
+        try:
+            d = fetch(p)
+        except Exception as e:
+            print(f"[skip] {p['name']}: {str(e).replace(KEY, '***')}")
+            continue
+
+        cur = d.get("currentSpeed")
+        free = d.get("freeFlowSpeed")
+        ratio = round(1 - cur / free, 3) if cur is not None and free else ""
+
+        rows.append({
+            "timestamp": now.isoformat(timespec="minutes"),
+            "weekday": now.strftime("%A"),
+            "hour": now.hour,
+            "minute": now.minute,
+            "name": p["name"],
+            "lat": p["lat"],
+            "lon": p["lon"],
+            "road_class": d.get("frc"),
+            "current_speed_kmh": cur,
+            "free_flow_speed_kmh": free,
+            "current_travel_time_s": d.get("currentTravelTime"),
+            "free_flow_travel_time_s": d.get("freeFlowTravelTime"),
+            "congestion_ratio": ratio,
+            "confidence": d.get("confidence"),
+            "road_closure": d.get("roadClosure"),
+        })
+        time.sleep(0.3)  # stay well under TomTom's requests-per-second limit
+
+    if not rows:
+        sys.exit("FAILED: no point returned data. Read the [skip] lines above "
+                 "for TomTom's error (403 = key problem, 400 = bad points).")
+
     os.makedirs(OUT_DIR, exist_ok=True)
     out_path = os.path.join(OUT_DIR, f"traffic_{now:%Y-%m}.csv")
-    new_file = not os.path.exists(out_path)
-
-    ok = 0
     with open(out_path, "a", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=FIELDS)
-        if new_file:
+        if f.tell() == 0:
             writer.writeheader()
+        writer.writerows(rows)
 
-        for p in points:
-            try:
-                d = fetch(p)
-            except Exception as e:
-                print(f"[skip] {p['name']}: {e}")
-                continue
-
-            cur = d.get("currentSpeed")
-            free = d.get("freeFlowSpeed")
-            ratio = round(1 - cur / free, 3) if cur is not None and free else ""
-
-            writer.writerow({
-                "timestamp": now.isoformat(timespec="minutes"),
-                "weekday": now.strftime("%A"),
-                "hour": now.hour,
-                "minute": now.minute,
-                "name": p["name"],
-                "lat": p["lat"],
-                "lon": p["lon"],
-                "road_class": d.get("frc"),
-                "current_speed_kmh": cur,
-                "free_flow_speed_kmh": free,
-                "current_travel_time_s": d.get("currentTravelTime"),
-                "free_flow_travel_time_s": d.get("freeFlowTravelTime"),
-                "congestion_ratio": ratio,
-                "confidence": d.get("confidence"),
-                "road_closure": d.get("roadClosure"),
-            })
-            ok += 1
-            time.sleep(0.3)  # stay well under TomTom's requests-per-second limit
-
-    print(f"{now:%Y-%m-%d %H:%M} saved {ok}/{len(points)} points -> {out_path}")
+    print(f"{now:%Y-%m-%d %H:%M} saved {len(rows)}/{len(points)} points -> {out_path}")
 
 
 if __name__ == "__main__":
